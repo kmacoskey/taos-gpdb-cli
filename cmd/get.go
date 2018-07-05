@@ -1,13 +1,11 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
-	"github.com/kmacoskey/taos/handlers"
+	"github.com/kmacoskey/taos-gpdb-cli/request"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,14 +33,24 @@ func init() {
 }
 
 func getCluster(id string) {
-	url := fmt.Sprintf("http://localhost:8080/cluster/%s", id)
-
-	_, body, err := httpClusterRequest("GET", url, []byte(``))
+	response, body, err := request.HttpClusterRequest("GET", fmt.Sprintf("cluster/%s", id), []byte(``))
 	if err != nil {
 		fmt.Println(err)
 	}
-	cluster_response_json := &handlers.ClusterResponse{}
+
+	var cluster_response_json interface{}
+
+	if response.StatusCode == http.StatusOK {
+		cluster_response_json = &request.ClusterResponse{}
+	} else {
+		cluster_response_json = &request.ErrorResponse{}
+	}
+
 	err = json.Unmarshal(body, &cluster_response_json)
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	data, err := json.Marshal(cluster_response_json)
 	if err != nil {
 		fmt.Println(err)
@@ -52,13 +60,19 @@ func getCluster(id string) {
 }
 
 func getClusters() {
-	url := "http://localhost:8080/clusters"
-
-	_, body, err := httpClusterRequest("GET", url, []byte(``))
+	response, body, err := request.HttpClusterRequest("GET", "clusters", []byte(``))
 	if err != nil {
 		fmt.Println(err)
 	}
-	cluster_response_json := &handlers.ClustersResponse{}
+
+	var cluster_response_json interface{}
+
+	if response.StatusCode == http.StatusOK {
+		cluster_response_json = &request.ClustersResponse{}
+	} else {
+		cluster_response_json = &request.ErrorResponse{}
+	}
+
 	err = json.Unmarshal(body, &cluster_response_json)
 	data, err := json.Marshal(cluster_response_json)
 	if err != nil {
@@ -66,26 +80,4 @@ func getClusters() {
 	}
 
 	fmt.Println(string(data))
-}
-
-func httpClusterRequest(request_type string, url string, body []byte) (*http.Response, []byte, error) {
-	req, err := http.NewRequest(request_type, url, bytes.NewBuffer(body))
-	if err != nil {
-		return nil, nil, err
-	}
-	req.Close = true
-
-	client := &http.Client{}
-	response, err := client.Do(req)
-	if err != nil {
-		return response, nil, err
-	}
-	defer response.Body.Close()
-
-	body, err = ioutil.ReadAll(response.Body)
-	if err != nil {
-		return response, body, err
-	}
-
-	return response, body, nil
 }
